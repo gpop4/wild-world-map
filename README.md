@@ -4,18 +4,16 @@ An interactive, kid-friendly world map web application built for curious young e
 
 ## ✨ Features
 
-- **Interactive Zoomable World Map (Leaflet):** Explore 28+ iconic places across all 7 continents, 5 oceans, 5 major deserts, large-country regions (e.g., Alaska, Yellowstone, Everglades, Australian Outback, Gir Forest, Sundarbans, Sichuan), and world-famous national parks.
-- **Animal Explorer Carousel:** Navigate effortlessly through each area's animals with big touch-friendly buttons, animal tabs, or keyboard arrow keys (`←` / `→`).
-- **Real Wildlife Photos + Offline-Safe Fallback:** Automatically fetches high-resolution wildlife photographs from Wikipedia with colorful illustrated emoji fallbacks.
-- **Read-Aloud Mode (Web Speech API):**
-  - Global **Auto-Read ON/OFF** toggle that automatically reads place intros and animal facts aloud as you click.
-  - **Play / Pause / Stop** controls, kid-friendly reading speed toggles (🐢 Slow / 🦊 Normal / 🐆 Fast), and live yellow highlighting of each fact while it is being read.
-  - Tap any individual fact, sound callout, or place intro to hear it immediately.
-- **Kid-Friendly Discovery Tools:**
-  - **🔍 Search** any animal, country, park, desert, or ocean.
-  - **🎲 Surprise Me!** button to fly to a random place and animal on Earth.
-  - **🐾 Explorer Passport** tracking how many animals have been discovered (saved locally in the browser).
-  - **Continent Quick-Jump Bar** and **Category Filters** (Countries & Regions, Parks & Jungles, Deserts, Oceans & Reefs).
+- **6 Explorer Modes:**
+  - **🗺️ Map Mode (Clutter-Free Atlas):** Clean National Geographic World Map with zero pin clutter—click **anywhere** on Earth to discover the wildlife living closest to that point!
+  - **🐾 Animal Mode (200 Animals):** Full-screen visual photo carousel of **200 unique animals** with group filters and shuffle; tap any animal to see where it lives on the map and listen immediately.
+  - **🏞️ Parks & Jungles Mode (19 Parks & Jungles):** Photo-collage carousel of the world's greatest parks and rainforests—tap any place to zoom to it on the map and take a guided audio+photo tour of the animals living there.
+  - **🏜️ Deserts Mode (10 Deserts):** Carousel of the world's iconic deserts (Sahara, Gobi, Kalahari, Arabian, Namib, Mojave, Sonoran, Atacama, Thar, Australian Outback).
+  - **🏔️ Mountains Mode (9 Mountain Ranges):** Carousel of iconic peaks & ranges (Himalayas, Andes, Alps, Kilimanjaro, Rockies, Ethiopian Highlands, Appalachians, Mount Fuji, Caucasus).
+  - **🏳️ Countries Mode (20 Countries & Regions):** Carousel of iconic countries and wildlife regions worldwide.
+- **200 Bundled Real Wildlife Photos:** Every animal has an optimized local photograph (`public/images/animals/`) plus tap-to-zoom **Big Photo** fullscreen mode.
+- **Pre-Generated Studio Voiceovers (Zero Runtime API Calls):** Uses pre-recorded `.m4a` clips generated locally with open-source **Kokoro-82M** (and Gemini TTS), with **Play / Pause / Stop**, **Tour All**, and **🐢 / 🦊 / 🐆** speed controls.
+- **Kid-Friendly Discovery Tools:** **🔍 Search** across all 200 animals & 64 places, **🎲 Surprise Me!**, **🐾 Explorer Passport** progress tracker (`localStorage`), and **Continent Quick-Jump Bar**.
 
 ---
 

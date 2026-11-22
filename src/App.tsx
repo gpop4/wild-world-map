@@ -2,28 +2,42 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Compass,
+  Flag,
   Globe,
   Map as MapIcon,
+  Mountain,
   PawPrint,
   Search,
   Shuffle,
+  Sun,
+  Trees,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
 import { CONTINENTS } from './data/continents';
 import { TOTAL_ANIMALS, WORLD_PLACES } from './data/places';
-import { ContinentView, PlaceCategory, WorldPlace } from './types';
+import { ContinentView, WorldPlace } from './types';
 import { useSpeech } from './hooks/useSpeech';
 import { WorldMap } from './components/WorldMap';
 import { AnimalDrawer } from './components/AnimalDrawer';
 import { AnimalEntry, AnimalMode } from './components/AnimalMode';
+import { PlaceMode } from './components/PlaceMode';
 
-type AppMode = 'map' | 'animals';
-type CategoryFilter = 'all' | PlaceCategory;
+type AppMode = 'map' | 'animals' | 'parks' | 'deserts' | 'mountains' | 'countries';
 
 const STORAGE_ANIMALS_KEY = 'wild-world-map:discovered-animals:v1';
 const STORAGE_PLACES_KEY = 'wild-world-map:discovered-places:v1';
+
+const MODE_META: Record<
+  Exclude<AppMode, 'map' | 'animals'>,
+  { label: string; emoji: string; category: WorldPlace['category'] }
+> = {
+  parks: { label: 'Parks & Jungles', emoji: '🏞️', category: 'park' },
+  deserts: { label: 'Deserts', emoji: '🏜️', category: 'desert' },
+  mountains: { label: 'Mountains', emoji: '🏔️', category: 'mountain' },
+  countries: { label: 'Countries', emoji: '🏳️', category: 'country' },
+};
 
 function loadSavedSet(key: string): Set<string> {
   try {
@@ -36,13 +50,48 @@ function loadSavedSet(key: string): Set<string> {
   }
 }
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findClosestPlace(lat: number, lng: number, places: WorldPlace[]): {
+  place: WorldPlace;
+  distanceKm: number;
+} {
+  let best = places[0];
+  let bestDist = Infinity;
+
+  for (const place of places) {
+    const dist = haversineKm(lat, lng, place.lat, place.lng);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = place;
+    }
+  }
+  return { place: best, distanceKm: bestDist };
+}
+
 export function App() {
   const [mode, setMode] = useState<AppMode>('map');
-  const [animalModeInspecting, setAnimalModeInspecting] = useState<boolean>(false);
-  const [carouselIndex, setCarouselIndex] = useState<number>(0);
+  const [inspectingOnMap, setInspectingOnMap] = useState<boolean>(false);
+  const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({
+    animals: 0,
+    parks: 0,
+    deserts: 0,
+    mountains: 0,
+    countries: 0,
+  });
 
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [selectedPlace, setSelectedPlace] = useState<WorldPlace | null>(null);
+  const [clickedPoint, setClickedPoint] = useState<{ lat: number; lng: number } | null>(null);
+  const [closestBannerText, setClosestBannerText] = useState<string | null>(null);
   const [animalIndex, setAnimalIndex] = useState<number>(0);
   const [continentTarget, setContinentTarget] = useState<ContinentView | null>(null);
   const [resetSignal, setResetSignal] = useState<number>(0);
@@ -59,7 +108,7 @@ export function App() {
 
   const speech = useSpeech();
 
-  // Build complete 100-animal library for Animal Mode
+  // Build complete 200-animal library for Animal Mode
   const allAnimalEntries = useMemo<AnimalEntry[]>(() => {
     const list: AnimalEntry[] = [];
     const seen = new Set<string>();
@@ -73,6 +122,16 @@ export function App() {
     }
     return list;
   }, []);
+
+  const placesByMode = useMemo(
+    () => ({
+      parks: WORLD_PLACES.filter((p) => p.category === 'park'),
+      deserts: WORLD_PLACES.filter((p) => p.category === 'desert'),
+      mountains: WORLD_PLACES.filter((p) => p.category === 'mountain'),
+      countries: WORLD_PLACES.filter((p) => p.category === 'country'),
+    }),
+    []
+  );
 
   // Persist passport progress
   useEffect(() => {
@@ -89,11 +148,6 @@ export function App() {
       // ignore storage errors
     }
   }, [discoveredAnimals, discoveredPlaces]);
-
-  const filteredPlaces = useMemo(() => {
-    if (categoryFilter === 'all') return WORLD_PLACES;
-    return WORLD_PLACES.filter((p) => p.category === categoryFilter);
-  }, [categoryFilter]);
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -138,7 +192,7 @@ export function App() {
       });
     }
 
-    return results.slice(0, 10);
+    return results.slice(0, 12);
   }, [searchQuery]);
 
   const markDiscovered = useCallback((place: WorldPlace, animalIdx: number) => {
@@ -160,16 +214,40 @@ export function App() {
     }
   }, []);
 
+  const startPlaceTour = useCallback(
+    (place: WorldPlace) => {
+      if (!speech.supported) return;
+      speech.playPlaceTour(place, (idx) => {
+        setAnimalIndex(idx);
+        markDiscovered(place, idx);
+      });
+    },
+    [speech, markDiscovered]
+  );
+
   const handleSelectPlace = useCallback(
-    (place: WorldPlace, startAnimalIdx = 0, forceReadAnimalOnly = false) => {
+    (
+      place: WorldPlace,
+      startAnimalIdx = 0,
+      options?: {
+        forceReadAnimalOnly?: boolean;
+        runTour?: boolean;
+        clickedLatLng?: { lat: number; lng: number } | null;
+        bannerText?: string | null;
+      }
+    ) => {
       setSelectedPlace(place);
       setAnimalIndex(startAnimalIdx);
+      setClickedPoint(options?.clickedLatLng ?? null);
+      setClosestBannerText(options?.bannerText ?? null);
       setSearchOpen(false);
       setSearchQuery('');
       markDiscovered(place, startAnimalIdx);
 
       const animal = place.animals[startAnimalIdx] ?? place.animals[0];
-      if (forceReadAnimalOnly && speech.supported) {
+      if (options?.runTour && speech.supported) {
+        startPlaceTour(place);
+      } else if (options?.forceReadAnimalOnly && speech.supported) {
         speech.playNarration(place, animal, false);
       } else if (autoRead && speech.supported) {
         speech.playNarration(place, animal, true);
@@ -177,37 +255,62 @@ export function App() {
         speech.stop();
       }
     },
-    [autoRead, speech, markDiscovered]
+    [autoRead, speech, markDiscovered, startPlaceTour]
   );
 
-  const handleSelectFromAnimalMode = useCallback(
-    (entry: AnimalEntry, indexInList: number) => {
-      setCarouselIndex(indexInList);
-      setCategoryFilter('all');
-      setAnimalModeInspecting(true);
-      handleSelectPlace(entry.place, entry.animalIndexInPlace, true);
+  // Clicking ANYWHERE on the clean world map finds the closest wildlife!
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => {
+      const { place } = findClosestPlace(lat, lng, WORLD_PLACES);
+      handleSelectPlace(place, 0, {
+        clickedLatLng: { lat, lng },
+        bannerText: `📍 Closest wildlife to where you clicked`,
+      });
     },
     [handleSelectPlace]
   );
 
-  const handleBackToAnimalCarousel = useCallback(() => {
+  const handleSelectFromAnimalMode = useCallback(
+    (entry: AnimalEntry, indexInList: number) => {
+      setCarouselIndices((prev) => ({ ...prev, animals: indexInList }));
+      setInspectingOnMap(true);
+      handleSelectPlace(entry.place, entry.animalIndexInPlace, {
+        forceReadAnimalOnly: true,
+      });
+    },
+    [handleSelectPlace]
+  );
+
+  const handleSelectFromPlaceMode = useCallback(
+    (place: WorldPlace, indexInList: number) => {
+      setCarouselIndices((prev) => ({ ...prev, [mode]: indexInList }));
+      setInspectingOnMap(true);
+      handleSelectPlace(place, 0, { runTour: true });
+    },
+    [mode, handleSelectPlace]
+  );
+
+  const handleBackToCarousel = useCallback(() => {
     speech.stop();
     setSelectedPlace(null);
-    setAnimalModeInspecting(false);
+    setClickedPoint(null);
+    setClosestBannerText(null);
+    setInspectingOnMap(false);
   }, [speech]);
 
   const handleSwitchMode = useCallback(
     (nextMode: AppMode) => {
-      if (nextMode === mode && !animalModeInspecting) return;
+      if (nextMode === mode && !inspectingOnMap) return;
       speech.stop();
       setMode(nextMode);
-      setAnimalModeInspecting(false);
+      setInspectingOnMap(false);
       setSearchOpen(false);
-      if (nextMode === 'animals') {
-        setSelectedPlace(null);
-      }
+      setSearchQuery('');
+      setClickedPoint(null);
+      setClosestBannerText(null);
+      setSelectedPlace(null);
     },
-    [mode, animalModeInspecting, speech]
+    [mode, inspectingOnMap, speech]
   );
 
   const handleSelectAnimalIndex = useCallback(
@@ -231,8 +334,10 @@ export function App() {
   const handleCloseDrawer = useCallback(() => {
     speech.stop();
     setSelectedPlace(null);
-    if (mode === 'animals') {
-      setAnimalModeInspecting(false);
+    setClickedPoint(null);
+    setClosestBannerText(null);
+    if (mode !== 'map') {
+      setInspectingOnMap(false);
     }
   }, [speech, mode]);
 
@@ -247,17 +352,23 @@ export function App() {
   }, [speech]);
 
   const handleSurpriseMe = useCallback(() => {
-    if (mode === 'animals' && !animalModeInspecting) {
+    if (mode === 'animals' && !inspectingOnMap) {
       const randomIdx = Math.floor(Math.random() * allAnimalEntries.length);
       handleSelectFromAnimalMode(allAnimalEntries[randomIdx], randomIdx);
       return;
     }
 
-    const pool = filteredPlaces.length > 0 ? filteredPlaces : WORLD_PLACES;
+    if (mode !== 'map' && mode !== 'animals' && !inspectingOnMap) {
+      const list = placesByMode[mode];
+      const randomIdx = Math.floor(Math.random() * list.length);
+      handleSelectFromPlaceMode(list[randomIdx], randomIdx);
+      return;
+    }
+
     const otherPlaces =
-      pool.length > 1 && selectedPlace
-        ? pool.filter((p) => p.id !== selectedPlace.id)
-        : pool;
+      WORLD_PLACES.length > 1 && selectedPlace
+        ? WORLD_PLACES.filter((p) => p.id !== selectedPlace.id)
+        : WORLD_PLACES;
     const randomPlace =
       otherPlaces[Math.floor(Math.random() * otherPlaces.length)];
     const randomAnimalIdx = Math.floor(
@@ -266,37 +377,47 @@ export function App() {
     handleSelectPlace(randomPlace, randomAnimalIdx);
   }, [
     mode,
-    animalModeInspecting,
+    inspectingOnMap,
     allAnimalEntries,
+    placesByMode,
     handleSelectFromAnimalMode,
-    filteredPlaces,
+    handleSelectFromPlaceMode,
     selectedPlace,
     handleSelectPlace,
   ]);
 
   const handleJumpContinent = useCallback((continent: ContinentView) => {
     setContinentTarget({ ...continent });
-    setCategoryFilter('all');
   }, []);
 
   const handleResetWorld = useCallback(() => {
     speech.stop();
     setSelectedPlace(null);
+    setClickedPoint(null);
+    setClosestBannerText(null);
     setContinentTarget(null);
-    setCategoryFilter('all');
-    setAnimalModeInspecting(false);
+    setInspectingOnMap(false);
     setMode('map');
     setResetSignal((n) => n + 1);
   }, [speech]);
 
-  const showingCarousel = mode === 'animals' && !animalModeInspecting;
+  const showingCarousel = mode !== 'map' && !inspectingOnMap;
+  const activePlaceMode: Exclude<AppMode, 'map' | 'animals'> | null =
+    showingCarousel && mode !== 'animals' ? mode : null;
   const focusedAnimal =
-    mode === 'animals' && animalModeInspecting && selectedPlace
+    mode === 'animals' && inspectingOnMap && selectedPlace
       ? {
           animal: selectedPlace.animals[animalIndex] ?? selectedPlace.animals[0],
           place: selectedPlace,
         }
       : null;
+
+  const backLabel =
+    mode === 'animals'
+      ? 'Back to Animal Carousel'
+      : mode !== 'map'
+        ? `Back to ${MODE_META[mode].label}`
+        : '';
 
   return (
     <div className="app-shell">
@@ -306,38 +427,18 @@ export function App() {
           type="button"
           className="brand-btn"
           onClick={handleResetWorld}
-          title="Back to Wild World Map"
+          title="Back to Clean World Map"
         >
           <span className="brand-btn__globe">🌍</span>
           <div className="brand-btn__text">
             <h1>Wild World Map</h1>
             <span>
-              {showingCarousel
-                ? 'Browse 100 animals & tap to find them!'
-                : 'Click any place to meet its animals!'}
+              {mode === 'map'
+                ? 'Tap anywhere on Earth to meet nearby animals!'
+                : `200 animals across 64 wild places`}
             </span>
           </div>
         </button>
-
-        {/* Map Mode / Animal Mode Switcher */}
-        <div className="mode-switcher" role="group" aria-label="Explorer mode">
-          <button
-            type="button"
-            className={`mode-btn ${mode === 'map' ? 'mode-btn--active' : ''}`}
-            onClick={() => handleSwitchMode('map')}
-          >
-            <MapIcon size={16} />
-            <span>Map Mode</span>
-          </button>
-          <button
-            type="button"
-            className={`mode-btn ${mode === 'animals' ? 'mode-btn--active' : ''}`}
-            onClick={() => handleSwitchMode('animals')}
-          >
-            <PawPrint size={16} />
-            <span>Animal Mode</span>
-          </button>
-        </div>
 
         {/* Search Box */}
         <div className="search-wrap">
@@ -353,8 +454,8 @@ export function App() {
               }}
               placeholder={
                 showingCarousel
-                  ? 'Filter 100 animals (e.g. Tiger, Penguin)...'
-                  : 'Search animal, desert, ocean, park...'
+                  ? 'Filter this carousel...'
+                  : 'Search any of 200 animals or 64 places...'
               }
               aria-label="Search animals or places"
             />
@@ -377,7 +478,7 @@ export function App() {
             <div className="search-dropdown">
               {searchResults.length === 0 ? (
                 <div className="search-empty">
-                  No matches yet—try "Tiger", "Sahara", "Ocean", or "Penguin"!
+                  No matches yet—try "Capybara", "Meerkat", "Kilimanjaro", or "Sahara"!
                 </div>
               ) : (
                 searchResults.map((item) => (
@@ -417,7 +518,7 @@ export function App() {
             type="button"
             className="action-pill action-pill--surprise"
             onClick={handleSurpriseMe}
-            title="Fly to a surprise animal anywhere on Earth!"
+            title="Discover a surprise place or animal!"
           >
             <Shuffle size={17} />
             <span>Surprise Me!</span>
@@ -435,83 +536,136 @@ export function App() {
         </div>
       </header>
 
-      {/* Animal Mode Carousel OR World Map View */}
-      {showingCarousel ? (
+      {/* Explorer Mode Bar (6 Modes!) */}
+      <nav className="mode-bar" aria-label="Explorer Modes">
+        <button
+          type="button"
+          className={`mode-tab ${mode === 'map' ? 'mode-tab--active' : ''}`}
+          onClick={() => handleSwitchMode('map')}
+        >
+          <MapIcon size={16} />
+          <span>Map Mode</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mode-tab ${mode === 'animals' ? 'mode-tab--active' : ''}`}
+          onClick={() => handleSwitchMode('animals')}
+        >
+          <PawPrint size={16} />
+          <span>Animals</span>
+          <span className="mode-tab__count">{allAnimalEntries.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mode-tab ${mode === 'parks' ? 'mode-tab--active' : ''}`}
+          onClick={() => handleSwitchMode('parks')}
+        >
+          <Trees size={16} />
+          <span>Parks &amp; Jungles</span>
+          <span className="mode-tab__count">{placesByMode.parks.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mode-tab ${mode === 'deserts' ? 'mode-tab--active' : ''}`}
+          onClick={() => handleSwitchMode('deserts')}
+        >
+          <Sun size={16} />
+          <span>Deserts</span>
+          <span className="mode-tab__count">{placesByMode.deserts.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mode-tab ${mode === 'mountains' ? 'mode-tab--active' : ''}`}
+          onClick={() => handleSwitchMode('mountains')}
+        >
+          <Mountain size={16} />
+          <span>Mountains</span>
+          <span className="mode-tab__count">{placesByMode.mountains.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mode-tab ${mode === 'countries' ? 'mode-tab--active' : ''}`}
+          onClick={() => handleSwitchMode('countries')}
+        >
+          <Flag size={16} />
+          <span>Countries</span>
+          <span className="mode-tab__count">{placesByMode.countries.length}</span>
+        </button>
+
+        {mode === 'map' && (
+          <button
+            type="button"
+            className="filter-chip filter-chip--world"
+            onClick={handleResetWorld}
+          >
+            <Globe size={15} /> World View
+          </button>
+        )}
+      </nav>
+
+      {/* Main Content Area: Carousel OR Map View */}
+      {showingCarousel && mode === 'animals' ? (
         <AnimalMode
           entries={allAnimalEntries}
-          activeIndex={carouselIndex}
+          activeIndex={carouselIndices.animals ?? 0}
           searchQuery={searchQuery}
           discoveredAnimalIds={discoveredAnimals}
           hasAnimalStudioVoice={speech.hasAnimalStudioVoice}
-          onChangeActiveIndex={setCarouselIndex}
+          onChangeActiveIndex={(idx) =>
+            setCarouselIndices((prev) => ({ ...prev, animals: idx }))
+          }
           onSelectAnimal={handleSelectFromAnimalMode}
+        />
+      ) : activePlaceMode ? (
+        <PlaceMode
+          title={MODE_META[activePlaceMode].label}
+          emoji={MODE_META[activePlaceMode].emoji}
+          places={placesByMode[activePlaceMode]}
+          activeIndex={carouselIndices[activePlaceMode] ?? 0}
+          searchQuery={searchQuery}
+          discoveredPlaceIds={discoveredPlaces}
+          onChangeActiveIndex={(idx) =>
+            setCarouselIndices((prev) => ({ ...prev, [activePlaceMode]: idx }))
+          }
+          onSelectPlace={handleSelectFromPlaceMode}
         />
       ) : (
         <>
-          {/* Category Filter Row (shown in Map Mode) */}
-          {mode === 'map' && (
-            <nav className="filter-bar" aria-label="Filter map places">
-              {(
-                [
-                  { id: 'all', label: '🌍 All Places' },
-                  { id: 'country', label: '🗺️ Countries & Regions' },
-                  { id: 'park', label: '🏞️ Parks & Jungles' },
-                  { id: 'desert', label: '🏜️ Deserts' },
-                  { id: 'ocean', label: '🌊 Oceans & Reefs' },
-                ] as Array<{ id: CategoryFilter; label: string }>
-              ).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`filter-chip ${
-                    categoryFilter === item.id ? 'filter-chip--active' : ''
-                  }`}
-                  onClick={() => setCategoryFilter(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="filter-chip filter-chip--world"
-                onClick={handleResetWorld}
-              >
-                <Globe size={15} /> World View
-              </button>
-            </nav>
-          )}
-
-          {/* Main Interactive Map */}
+          {/* Clean, Uncluttered Interactive World Map */}
           <main className="map-stage">
             <WorldMap
-              places={filteredPlaces}
               selectedPlace={selectedPlace}
+              clickedPoint={clickedPoint}
               focusedAnimal={focusedAnimal}
-              discoveredPlaceIds={discoveredPlaces}
               continentTarget={continentTarget}
               resetSignal={resetSignal}
+              onMapClick={handleMapClick}
               onSelectPlace={(p) => handleSelectPlace(p, 0)}
             />
 
-            {/* Back to Animal Carousel floating button when inspecting an animal from Animal Mode */}
-            {mode === 'animals' && animalModeInspecting && (
+            {/* Back to Carousel floating button when inspecting from any Carousel Mode */}
+            {mode !== 'map' && inspectingOnMap && (
               <button
                 type="button"
                 className="back-carousel-btn"
-                onClick={handleBackToAnimalCarousel}
+                onClick={handleBackToCarousel}
               >
                 <ArrowLeft size={18} />
-                <span>Back to Animal Carousel</span>
+                <span>{backLabel}</span>
               </button>
             )}
 
-            {/* Friendly Welcome Hint when nothing is open */}
+            {/* Friendly Welcome Hint on the clean Map Mode */}
             {!selectedPlace && mode === 'map' && (
               <div className="welcome-toast">
                 <Compass size={18} />
                 <span>
-                  Tap any glowing badge on the map to explore animals &amp; hear fun facts!
+                  Tap anywhere on the world map to discover the animals living closest to that spot!
                 </span>
               </div>
             )}
@@ -522,16 +676,18 @@ export function App() {
                 place={selectedPlace}
                 animalIndex={animalIndex}
                 discoveredAnimalIds={discoveredAnimals}
+                closestBannerText={closestBannerText}
                 autoRead={autoRead}
                 onToggleAutoRead={handleToggleAutoRead}
                 speech={speech}
                 onSelectAnimalIndex={handleSelectAnimalIndex}
+                onStartPlaceTour={() => startPlaceTour(selectedPlace)}
                 onClose={handleCloseDrawer}
               />
             )}
           </main>
 
-          {/* Bottom Continent Quick-Jump Bar */}
+          {/* Bottom Continent Quick-Jump Bar in Map Mode */}
           {mode === 'map' && (
             <footer className="continent-bar" aria-label="Jump to a continent">
               {CONTINENTS.map((cont) => (

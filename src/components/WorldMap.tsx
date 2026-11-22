@@ -3,34 +3,39 @@ import L from 'leaflet';
 import { Animal, ContinentView, WorldPlace } from '../types';
 
 interface WorldMapProps {
-  places: WorldPlace[];
   selectedPlace: WorldPlace | null;
+  clickedPoint: { lat: number; lng: number } | null;
   focusedAnimal?: { animal: Animal; place: WorldPlace } | null;
-  discoveredPlaceIds: Set<string>;
   continentTarget: ContinentView | null;
   resetSignal: number;
+  onMapClick: (lat: number, lng: number) => void;
   onSelectPlace: (place: WorldPlace) => void;
 }
 
 export function WorldMap({
-  places,
   selectedPlace,
+  clickedPoint,
   focusedAnimal = null,
-  discoveredPlaceIds,
   continentTarget,
   resetSignal,
+  onMapClick,
   onSelectPlace,
 }: WorldMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const onMapClickRef = useRef(onMapClick);
   const onSelectPlaceRef = useRef(onSelectPlace);
+
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
 
   useEffect(() => {
     onSelectPlaceRef.current = onSelectPlace;
   }, [onSelectPlace]);
 
-  // Initialize Leaflet map once
+  // Initialize clean, uncluttered Leaflet National Geographic World Map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -50,7 +55,6 @@ export function WorldMap({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // National Geographic World Map basemap (no API key required, rich geography & colors)
     const natGeoLayer = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}',
       {
@@ -72,6 +76,12 @@ export function WorldMap({
 
     natGeoLayer.addTo(map);
 
+    // Click anywhere on the clean world map to discover the closest wildlife!
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      const wrapped = e.latlng.wrap();
+      onMapClickRef.current(wrapped.lat, wrapped.lng);
+    });
+
     const group = L.layerGroup().addTo(map);
     mapRef.current = map;
     layerGroupRef.current = group;
@@ -88,86 +98,102 @@ export function WorldMap({
     };
   }, []);
 
-  // Render place markers & clickable highlight zones
+  // Only show the active selection (zero clutter when nothing is selected!)
   useEffect(() => {
     const group = layerGroupRef.current;
     if (!group) return;
 
     group.clearLayers();
+    if (!selectedPlace) return;
 
-    places.forEach((place) => {
-      const isSelected = selectedPlace?.id === place.id;
-      const isFocusedAnimalPlace = focusedAnimal?.place.id === place.id;
-      const isDiscovered = discoveredPlaceIds.has(place.id);
-
-      // Soft clickable region highlight circle
-      const radiusMeters = (place.radiusKm ?? 250) * 1000;
-      const circle = L.circle([place.lat, place.lng], {
-        radius: isFocusedAnimalPlace ? Math.max(radiusMeters, 320000) : radiusMeters,
-        color: isSelected || isFocusedAnimalPlace ? '#facc15' : place.color,
-        weight: isSelected || isFocusedAnimalPlace ? 4 : 1.5,
-        opacity: isSelected || isFocusedAnimalPlace ? 0.98 : 0.45,
-        fillColor: isFocusedAnimalPlace ? '#facc15' : place.color,
-        fillOpacity: isFocusedAnimalPlace ? 0.32 : isSelected ? 0.28 : 0.12,
-        className: 'place-zone-circle',
-      });
-
-      circle.on('click', () => {
-        onSelectPlaceRef.current(place);
-      });
-      circle.addTo(group);
-
-      // Playful custom pin marker (shows special "Found Here!" spotlight in Animal Mode)
-      const iconHtml =
-        isFocusedAnimalPlace && focusedAnimal
-          ? `
-        <div class="map-pin map-pin--selected map-pin--animal-focus" style="--pin-color: ${place.color}">
-          <span class="map-pin__emoji">${focusedAnimal.animal.emoji}</span>
-          <span class="map-pin__label">${focusedAnimal.animal.name} lives here! (${place.name})</span>
-        </div>
-      `
-          : `
-        <div class="map-pin ${isSelected ? 'map-pin--selected' : ''} ${
-              isDiscovered ? 'map-pin--discovered' : ''
-            }" style="--pin-color: ${place.color}">
-          <span class="map-pin__emoji">${place.emoji}</span>
-          <span class="map-pin__label">${place.name}</span>
-          <span class="map-pin__count">${place.animals.length}</span>
-          ${isDiscovered ? '<span class="map-pin__star" title="Visited!">⭐</span>' : ''}
-        </div>
-      `;
-
-      const icon = L.divIcon({
-        html: iconHtml,
-        className: 'map-pin-wrapper',
-        iconSize: [0, 0],
-        iconAnchor: [0, 0],
-      });
-
-      const marker = L.marker([place.lat, place.lng], {
-        icon,
-        zIndexOffset: isSelected || isFocusedAnimalPlace ? 1000 : 100,
-      });
-
-      marker.on('click', () => {
-        onSelectPlaceRef.current(place);
-      });
-
-      marker.addTo(group);
+    const radiusMeters = Math.max((selectedPlace.radiusKm ?? 250) * 1000, 220000);
+    const circle = L.circle([selectedPlace.lat, selectedPlace.lng], {
+      radius: radiusMeters,
+      color: '#facc15',
+      weight: 4,
+      opacity: 0.96,
+      fillColor: selectedPlace.color,
+      fillOpacity: 0.28,
+      className: 'place-zone-circle',
     });
-  }, [places, selectedPlace, focusedAnimal, discoveredPlaceIds]);
+    circle.on('click', (e) => {
+      L.DomEvent.stopPropagation(e);
+      onSelectPlaceRef.current(selectedPlace);
+    });
+    circle.addTo(group);
+
+    // If user clicked a spot on the map, show a clean ripple dot where they clicked
+    if (clickedPoint) {
+      const clickedDot = L.circleMarker([clickedPoint.lat, clickedPoint.lng], {
+        radius: 7,
+        color: '#ffffff',
+        weight: 3,
+        fillColor: '#ef4444',
+        fillOpacity: 1,
+      });
+      clickedDot.addTo(group);
+
+      const line = L.polyline(
+        [
+          [clickedPoint.lat, clickedPoint.lng],
+          [selectedPlace.lat, selectedPlace.lng],
+        ],
+        {
+          color: '#2563eb',
+          weight: 2.5,
+          dashArray: '6 6',
+          opacity: 0.8,
+        }
+      );
+      line.addTo(group);
+    }
+
+    const isFocusedAnimalPlace = focusedAnimal?.place.id === selectedPlace.id;
+    const iconHtml =
+      isFocusedAnimalPlace && focusedAnimal
+        ? `
+      <div class="map-pin map-pin--selected map-pin--animal-focus" style="--pin-color: ${selectedPlace.color}">
+        <span class="map-pin__emoji">${focusedAnimal.animal.emoji}</span>
+        <span class="map-pin__label">${focusedAnimal.animal.name} lives here! (${selectedPlace.name})</span>
+      </div>
+    `
+        : `
+      <div class="map-pin map-pin--selected" style="--pin-color: ${selectedPlace.color}">
+        <span class="map-pin__emoji">${selectedPlace.emoji}</span>
+        <span class="map-pin__label">${selectedPlace.name}</span>
+        <span class="map-pin__count">${selectedPlace.animals.length}</span>
+      </div>
+    `;
+
+    const icon = L.divIcon({
+      html: iconHtml,
+      className: 'map-pin-wrapper',
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+
+    const marker = L.marker([selectedPlace.lat, selectedPlace.lng], {
+      icon,
+      zIndexOffset: 1000,
+    });
+    marker.on('click', (e) => {
+      L.DomEvent.stopPropagation(e);
+      onSelectPlaceRef.current(selectedPlace);
+    });
+    marker.addTo(group);
+  }, [selectedPlace, clickedPoint, focusedAnimal]);
 
   // Smoothly fly to selected place
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !selectedPlace) return;
 
-    // Slight longitude offset on wide screens so the pin stays nicely visible beside the side drawer
     const isWide = window.innerWidth >= 900;
-    const lngOffset = isWide ? 8 / Math.pow(2, Math.max(selectedPlace.zoom - 3, 0)) : 0;
+    const targetZoom = Math.max(selectedPlace.zoom, 4);
+    const lngOffset = isWide ? 8 / Math.pow(2, Math.max(targetZoom - 3, 0)) : 0;
 
-    map.flyTo([selectedPlace.lat, selectedPlace.lng + lngOffset], selectedPlace.zoom, {
-      duration: 1.1,
+    map.flyTo([selectedPlace.lat, selectedPlace.lng + lngOffset], targetZoom, {
+      duration: 1.0,
       easeLinearity: 0.25,
     });
   }, [selectedPlace]);
@@ -178,7 +204,7 @@ export function WorldMap({
     if (!map || !continentTarget) return;
 
     map.flyTo([continentTarget.lat, continentTarget.lng], continentTarget.zoom, {
-      duration: 1.0,
+      duration: 0.9,
     });
   }, [continentTarget]);
 
@@ -187,8 +213,14 @@ export function WorldMap({
     const map = mapRef.current;
     if (!map || resetSignal === 0) return;
 
-    map.flyTo([20, 10], 2, { duration: 0.9 });
+    map.flyTo([20, 10], 2, { duration: 0.85 });
   }, [resetSignal]);
 
-  return <div ref={containerRef} className="world-map-canvas" aria-label="Interactive World Map" />;
+  return (
+    <div
+      ref={containerRef}
+      className="world-map-canvas world-map-canvas--clickable"
+      aria-label="Interactive World Map — click anywhere to meet nearby animals"
+    />
+  );
 }

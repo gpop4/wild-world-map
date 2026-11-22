@@ -1869,3 +1869,212 @@ button {
     font-size: 13.5px;
   }
 }
+
+/* =====================================================
+   6-MODE NAVIGATION BAR & PLACE CAROUSEL COLLAGE
+   ===================================================== */
+.mode-bar {
+  position: relative;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border-bottom: 2px solid #e2e8f0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mode-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.mode-tab {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
+  border: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.mode-tab:hover {
+  background: #e2e8f0;
+}
+
+.mode-tab--active {
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  color: #ffffff;
+  border-color: #1d4ed8;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.28);
+}
+
+.mode-tab__count {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(15, 23, 42, 0.1);
+  color: inherit;
+}
+
+.mode-tab--active .mode-tab__count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.world-map-canvas--clickable {
+  cursor: crosshair;
+}
+
+.closest-spot-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: #fef3c7;
+  color: #92400e;
+  border: 1.5px solid #fde68a;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.btn-tour-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 11px;
+  border-radius: var(--radius-pill);
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1.5px solid #93c5fd;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: background 0.14s ease, transform 0.14s ease;
+}
+
+.btn-tour-all:hover {
+  background: #bfdbfe;
+  transform: scale(1.03);
+}
+
+/* Place Carousel Mode (Parks & Jungles, Deserts, Mountains, Countries) */
+.place-mode__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.place-mode__heading-emoji {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.place-mode__heading h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.place-mode__heading-hint {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.place-hero-card {
+  width: min(560px, 100%);
+}
+
+.place-collage {
+  position: relative;
+  width: 100%;
+  height: clamp(220px, 38vh, 330px);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 3px;
+  background: #0f172a;
+  overflow: hidden;
+}
+
+.place-collage__tile {
+  position: relative;
+  overflow: hidden;
+  background: #1e293b;
+}
+
+.place-collage__tile:first-child:nth-last-child(3) {
+  grid-row: span 2;
+}
+
+.place-collage__tile:first-child:nth-last-child(2),
+.place-collage__tile:nth-child(2):last-child {
+  grid-row: span 2;
+}
+
+.place-collage__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.place-hero-card:hover .place-collage__img {
+  transform: scale(1.04);
+}
+
+.place-collage__label {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(15, 23, 42, 0.72);
+  color: #ffffff;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  max-width: calc(100% - 12px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.place-hero-card__subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #475569;
+  margin-top: -4px;
+}
+
+.deck-card--place {
+  width: 130px;
+}
+
+.deck-card--place .deck-card__img-wrap {
+  width: 114px;
+}
+
+.deck-card__place-emoji {
+  position: absolute;
+  bottom: 3px;
+  left: 4px;
+  font-size: 16px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+}

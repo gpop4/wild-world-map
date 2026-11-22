@@ -1,4 +1,4 @@
-export type PlaceCategory = 'country' | 'park' | 'desert' | 'ocean';
+export type PlaceCategory = 'country' | 'park' | 'desert' | 'mountain' | 'ocean';
 
 export type ContinentId =
   | 'north-america'

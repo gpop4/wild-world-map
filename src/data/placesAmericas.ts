@@ -619,7 +619,7 @@ export const PLACES_AMERICAS: WorldPlace[] = [
     id: 'andes-peru',
     name: 'Andes Mountains',
     subtitle: 'Peru — Sky-High Peaks',
-    category: 'country',
+    category: 'mountain',
     continent: 'south-america',
     lat: -13.5319,
     lng: -71.9675,

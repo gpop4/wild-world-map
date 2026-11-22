@@ -22,6 +22,7 @@ interface AnimalDrawerProps {
   place: WorldPlace;
   animalIndex: number;
   discoveredAnimalIds: Set<string>;
+  closestBannerText?: string | null;
   autoRead: boolean;
   onToggleAutoRead: () => void;
   speech: {
@@ -36,19 +37,22 @@ interface AnimalDrawerProps {
     activeSegmentId: string | null;
     playPlaceIntro: (place: WorldPlace) => void;
     playNarration: (place: WorldPlace, animal: Animal, includePlaceIntro: boolean) => void;
+    playPlaceTour: (place: WorldPlace, onAnimalChange: (idx: number) => void) => void;
     speakText: (text: string, segmentId?: string) => void;
     pause: () => void;
     resume: () => void;
     stop: () => void;
   };
   onSelectAnimalIndex: (index: number) => void;
+  onStartPlaceTour?: () => void;
   onClose: () => void;
 }
 
 const CATEGORY_LABELS: Record<WorldPlace['category'], string> = {
-  country: '🗺️ Country / Region',
-  park: '🏞️ National Park / Wildland',
+  country: '🏳️ Country / Region',
+  park: '🏞️ Park / Jungle',
   desert: '🏜️ Desert',
+  mountain: '🏔️ Mountains',
   ocean: '🌊 Ocean / Sea',
 };
 
@@ -69,10 +73,12 @@ export function AnimalDrawer({
   place,
   animalIndex,
   discoveredAnimalIds,
+  closestBannerText,
   autoRead,
   onToggleAutoRead,
   speech,
   onSelectAnimalIndex,
+  onStartPlaceTour,
   onClose,
 }: AnimalDrawerProps) {
   const animal = place.animals[animalIndex] ?? place.animals[0];
@@ -129,6 +135,9 @@ export function AnimalDrawer({
           className="drawer-header"
           style={{ '--place-color': place.color } as React.CSSProperties}
         >
+          {closestBannerText && (
+            <div className="closest-spot-pill">{closestBannerText}</div>
+          )}
           <div className="drawer-header__compact-row">
             <span className="drawer-header__emoji">{place.emoji}</span>
             <div className="drawer-header__title-wrap">
@@ -318,6 +327,17 @@ export function AnimalDrawer({
                     aria-label="Stop reading"
                   >
                     <Square size={15} /> Stop
+                  </button>
+                )}
+
+                {!speech.isSpeaking && onStartPlaceTour && place.animals.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn-tour-all"
+                    onClick={onStartPlaceTour}
+                    title="Hear about every animal that lives here!"
+                  >
+                    🎙️ Tour All ({place.animals.length})
                   </button>
                 )}
               </div>

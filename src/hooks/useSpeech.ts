@@ -11,8 +11,8 @@ interface AudioManifest {
 }
 
 type QueueStep =
-  | { kind: 'audio'; id: string; url: string; fallbackText: string }
-  | { kind: 'tts'; id: string; text: string };
+  | { kind: 'audio'; id: string; url: string; fallbackText: string; onStepStart?: () => void }
+  | { kind: 'tts'; id: string; text: string; onStepStart?: () => void };
 
 const AUDIO_RATES: Record<SpeedPreset, number> = {
   slow: 0.84,
@@ -252,6 +252,8 @@ export function useSpeech() {
         }
 
         const step = steps[idx];
+        step.onStepStart?.();
+
         const advanceWithPause = () => {
           if (runIdRef.current !== currentRunId) return;
           if (idx + 1 >= steps.length) {
@@ -377,6 +379,67 @@ export function useSpeech() {
     [manifest, runQueue]
   );
 
+  const playPlaceTour = useCallback(
+    (place: WorldPlace, onAnimalChange: (animalIdx: number) => void) => {
+      const steps: QueueStep[] = [];
+
+      const placeText = `Welcome to ${place.name}, in ${place.subtitle}! ${place.intro}`;
+      const placeAudio = manifest.places[place.id];
+      if (placeAudio) {
+        steps.push({
+          kind: 'audio',
+          id: 'place-intro',
+          url: `./${placeAudio}`,
+          fallbackText: placeText,
+        });
+      } else {
+        steps.push({ kind: 'tts', id: 'place-intro', text: placeText });
+      }
+
+      place.animals.forEach((animal, idx) => {
+        const animalAudio = manifest.animals[animal.id];
+        const onStart = () => onAnimalChange(idx);
+        if (animalAudio) {
+          const fallbackFull = [
+            `Meet the ${animal.name}! It is a ${animal.group.toLowerCase()} that lives in ${animal.habitat}.`,
+            `Size check: ${animal.sizeComparison}`,
+            `Listen for its sound: ${animal.soundText}`,
+            ...animal.facts.map((f, i) => `Fun fact number ${i + 1}: ${f}`),
+          ].join(' ');
+          steps.push({
+            kind: 'audio',
+            id: 'animal-story',
+            url: `./${animalAudio}`,
+            fallbackText: fallbackFull,
+            onStepStart: onStart,
+          });
+        } else {
+          steps.push({
+            kind: 'tts',
+            id: 'animal-header',
+            text: `Meet the ${animal.name}! It is a ${animal.group.toLowerCase()} that lives in ${animal.habitat}. Size check: ${animal.sizeComparison}`,
+            onStepStart: onStart,
+          });
+          steps.push({
+            kind: 'tts',
+            id: 'animal-sound',
+            text: `Listen for its sound: ${animal.soundText}`,
+          });
+          animal.facts.forEach((fact, fIdx) => {
+            steps.push({
+              kind: 'tts',
+              id: `fact-${fIdx}`,
+              text: `Fun fact number ${fIdx + 1}: ${fact}`,
+            });
+          });
+        }
+      });
+
+      runQueue(steps);
+    },
+    [manifest, runQueue]
+  );
+
   const speakText = useCallback(
     (text: string, segmentId = 'single') => {
       runQueue([{ kind: 'tts', id: segmentId, text }]);
@@ -406,6 +469,7 @@ export function useSpeech() {
     activeSegmentId,
     playPlaceIntro,
     playNarration,
+    playPlaceTour,
     speakText,
     pause,
     resume,
