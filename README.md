@@ -36,17 +36,25 @@ npm run dev
 ```
 Open the local URL printed in the terminal (typically `http://localhost:5173`) in your browser.
 
-### 3. Pre-Generate Studio Gemini TTS Voiceovers (Optional — Zero Runtime API Calls)
-To generate warm storybook voiceovers using **Gemini TTS (`gemini-2.5-flash-preview-tts`)** and bundle them as static `.m4a` clips in `public/audio/`:
+### 3. Pre-Generate Studio Voiceovers (Zero Runtime API Calls)
+All 136 voiceovers (36 places + 100 animals) are pre-generated as compact `.m4a` clips in `public/audio/` with zero runtime API calls. To generate voiceovers for newly added animals:
 
-```bash
-cd /Users/madhu/adyu-projects/wild-world-map
-# Put your key in .env.local (gitignored) or export it:
-export GEMINI_API_KEY="your-gemini-api-key"
-python3 scripts/generate_voiceovers.py
-```
+- **Option A — Kokoro-82M (Open-source, free, local, no API key or quota):**
+  ```bash
+  uv venv /tmp/kokoro-venv --python 3.12
+  uv pip install --python /tmp/kokoro-venv/bin/python kokoro-onnx soundfile
+  mkdir -p /tmp/kokoro-models
+  curl -sL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx" -o /tmp/kokoro-models/kokoro-v1.0.onnx
+  curl -sL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin" -o /tmp/kokoro-models/voices-v1.0.bin
+  /tmp/kokoro-venv/bin/python scripts/generate_kokoro_voiceovers.py --workers 4
+  ```
+- **Option B — Gemini TTS (`gemini-2.5-flash-preview-tts`):**
+  ```bash
+  export GEMINI_API_KEY="your-gemini-api-key"
+  python3 scripts/generate_voiceovers.py
+  ```
 
-The script automatically converts audio to compact `.m4a` files, writes `public/audio/manifest.json`, and skips already-generated clips on re-runs.
+Both scripts automatically skip existing clips and update `public/audio/manifest.json`.
 
 ### 4. Build for Production (Standalone Static Website)
 ```bash
