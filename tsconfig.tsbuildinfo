@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/animaldrawer.tsx","./src/components/worldmap.tsx","./src/data/continents.ts","./src/data/places.ts","./src/data/placesamericas.ts","./src/data/placeseurasiaafrica.ts","./src/data/placesoceaniapolaroceans.ts","./src/hooks/usespeech.ts","./src/hooks/usewikiphoto.ts"],"version":"5.9.3"}
