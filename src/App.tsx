@@ -13,10 +13,7 @@ import { TOTAL_ANIMALS, WORLD_PLACES } from './data/places';
 import { ContinentView, PlaceCategory, WorldPlace } from './types';
 import { useSpeech } from './hooks/useSpeech';
 import { WorldMap } from './components/WorldMap';
-import {
-  AnimalDrawer,
-  buildAnimalSpeechSegments,
-} from './components/AnimalDrawer';
+import { AnimalDrawer } from './components/AnimalDrawer';
 
 type CategoryFilter = 'all' | PlaceCategory;
 
@@ -149,8 +146,7 @@ export function App() {
 
       if (autoRead && speech.supported) {
         const animal = place.animals[startAnimalIdx] ?? place.animals[0];
-        const segments = buildAnimalSpeechSegments(place, animal, true);
-        speech.speakQueue(segments);
+        speech.playNarration(place, animal, true);
       } else {
         speech.stop();
       }
@@ -167,8 +163,7 @@ export function App() {
       if (autoRead && speech.supported) {
         const animal = selectedPlace.animals[nextIdx];
         if (animal) {
-          const segments = buildAnimalSpeechSegments(selectedPlace, animal, false);
-          speech.speakQueue(segments);
+          speech.playNarration(selectedPlace, animal, false);
         }
       } else {
         speech.stop();

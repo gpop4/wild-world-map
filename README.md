@@ -36,7 +36,19 @@ npm run dev
 ```
 Open the local URL printed in the terminal (typically `http://localhost:5173`) in your browser.
 
-### 3. Build for Production (Standalone Static Website)
+### 3. Pre-Generate Studio Gemini TTS Voiceovers (Optional — Zero Runtime API Calls)
+To generate warm storybook voiceovers using **Gemini TTS (`gemini-2.5-flash-preview-tts`)** and bundle them as static `.m4a` clips in `public/audio/`:
+
+```bash
+cd /Users/madhu/adyu-projects/wild-world-map
+# Put your key in .env.local (gitignored) or export it:
+export GEMINI_API_KEY="your-gemini-api-key"
+python3 scripts/generate_voiceovers.py
+```
+
+The script automatically converts audio to compact `.m4a` files, writes `public/audio/manifest.json`, and skips already-generated clips on re-runs.
+
+### 4. Build for Production (Standalone Static Website)
 ```bash
 npm run build
 ```

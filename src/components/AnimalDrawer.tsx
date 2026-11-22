@@ -14,7 +14,7 @@ import {
   Trees,
 } from 'lucide-react';
 import { Animal, WorldPlace } from '../types';
-import { SpeechSegment } from '../hooks/useSpeech';
+import { SpeedPreset } from '../hooks/useSpeech';
 import { useWikiPhoto } from '../hooks/useWikiPhoto';
 
 interface AnimalDrawerProps {
@@ -25,12 +25,16 @@ interface AnimalDrawerProps {
   onToggleAutoRead: () => void;
   speech: {
     supported: boolean;
-    rate: number;
-    setRate: (rate: number) => void;
+    hasStudioVoice: boolean;
+    hasAnimalStudioVoice: (animalId: string) => boolean;
+    activeEngine: 'audio' | 'tts' | null;
+    speedPreset: SpeedPreset;
+    setSpeedPreset: (preset: SpeedPreset) => void;
     isSpeaking: boolean;
     isPaused: boolean;
     activeSegmentId: string | null;
-    speakQueue: (segments: SpeechSegment[]) => void;
+    playPlaceIntro: (place: WorldPlace) => void;
+    playNarration: (place: WorldPlace, animal: Animal, includePlaceIntro: boolean) => void;
     speakText: (text: string, segmentId?: string) => void;
     pause: () => void;
     resume: () => void;
@@ -59,40 +63,6 @@ const STATUS_CLASS: Record<Animal['status'], string> = {
   Vulnerable: 'status-vulnerable',
   Endangered: 'status-endangered',
 };
-
-export function buildAnimalSpeechSegments(
-  place: WorldPlace,
-  animal: Animal,
-  includePlaceIntro: boolean
-): SpeechSegment[] {
-  const segments: SpeechSegment[] = [];
-
-  if (includePlaceIntro) {
-    segments.push({
-      id: 'place-intro',
-      text: `Welcome to ${place.name}, in ${place.subtitle}! ${place.intro}`,
-    });
-  }
-
-  segments.push({
-    id: 'animal-header',
-    text: `Meet the ${animal.name}! It is a ${animal.group.toLowerCase()} that lives in ${animal.habitat}. Size check: ${animal.sizeComparison}`,
-  });
-
-  segments.push({
-    id: 'animal-sound',
-    text: `Listen for its sound: ${animal.soundText}`,
-  });
-
-  animal.facts.forEach((fact, idx) => {
-    segments.push({
-      id: `fact-${idx}`,
-      text: `Fun fact number ${idx + 1}: ${fact}`,
-    });
-  });
-
-  return segments;
-}
 
 export function AnimalDrawer({
   place,
@@ -138,9 +108,11 @@ export function AnimalDrawer({
   }, [animalIndex, place.animals.length, onSelectAnimalIndex, onClose]);
 
   const handleReadCurrentAnimal = () => {
-    const segments = buildAnimalSpeechSegments(place, animal, false);
-    speech.speakQueue(segments);
+    speech.playNarration(place, animal, false);
   };
+
+  const isReadingAnimalStory =
+    speech.activeSegmentId === 'animal-story' || speech.activeSegmentId === 'animal-header';
 
   return (
     <aside className="animal-drawer" aria-label={`Animals of ${place.name}`}>
@@ -173,7 +145,7 @@ export function AnimalDrawer({
           className={`place-intro-box ${
             speech.activeSegmentId === 'place-intro' ? 'speaking-highlight' : ''
           }`}
-          onClick={() => speech.speakText(`${place.name}. ${place.intro}`, 'place-intro')}
+          onClick={() => speech.playPlaceIntro(place)}
           title="Tap to hear about this place"
         >
           <p>{place.intro}</p>
@@ -252,10 +224,17 @@ export function AnimalDrawer({
             </div>
 
             <div className="speech-bar__options">
+              {speech.hasAnimalStudioVoice(animal.id) && (
+                <span className="studio-voice-tag" title="Pre-recorded Gemini Studio Narration">
+                  ✨ AI Voice
+                </span>
+              )}
               <button
                 type="button"
-                className={`speed-pill ${speech.rate <= 0.7 ? 'speed-pill--active' : ''}`}
-                onClick={() => speech.setRate(0.65)}
+                className={`speed-pill ${
+                  speech.speedPreset === 'slow' ? 'speed-pill--active' : ''
+                }`}
+                onClick={() => speech.setSpeedPreset('slow')}
                 title="Extra slow story pace"
               >
                 🐢
@@ -263,18 +242,20 @@ export function AnimalDrawer({
               <button
                 type="button"
                 className={`speed-pill ${
-                  speech.rate > 0.7 && speech.rate < 0.88 ? 'speed-pill--active' : ''
+                  speech.speedPreset === 'normal' ? 'speed-pill--active' : ''
                 }`}
-                onClick={() => speech.setRate(0.78)}
+                onClick={() => speech.setSpeedPreset('normal')}
                 title="Gentle kid-friendly speed"
               >
                 🦊
               </button>
               <button
                 type="button"
-                className={`speed-pill ${speech.rate >= 0.88 ? 'speed-pill--active' : ''}`}
-                onClick={() => speech.setRate(0.92)}
-                title="Regular speed"
+                className={`speed-pill ${
+                  speech.speedPreset === 'fast' ? 'speed-pill--active' : ''
+                }`}
+                onClick={() => speech.setSpeedPreset('fast')}
+                title="Faster speed"
               >
                 🐆
               </button>
@@ -293,9 +274,7 @@ export function AnimalDrawer({
 
         {/* Animal Hero Card with Prev/Next */}
         <div
-          className={`animal-hero ${
-            speech.activeSegmentId === 'animal-header' ? 'speaking-highlight' : ''
-          }`}
+          className={`animal-hero ${isReadingAnimalStory ? 'speaking-highlight' : ''}`}
           style={{ '--animal-accent': animal.accentColor } as React.CSSProperties}
         >
           <div className="animal-hero__media">

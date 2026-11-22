@@ -707,6 +707,16 @@ button {
   border: 1.5px solid #86efac;
 }
 
+.studio-voice-tag {
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1.5px solid #c4b5fd;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 /* Animal Hero Card */
 .animal-hero {
   border-radius: 18px;
