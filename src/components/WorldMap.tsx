@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { ContinentView, WorldPlace } from '../types';
+import { Animal, ContinentView, WorldPlace } from '../types';
 
 interface WorldMapProps {
   places: WorldPlace[];
   selectedPlace: WorldPlace | null;
+  focusedAnimal?: { animal: Animal; place: WorldPlace } | null;
   discoveredPlaceIds: Set<string>;
   continentTarget: ContinentView | null;
   resetSignal: number;
@@ -14,6 +15,7 @@ interface WorldMapProps {
 export function WorldMap({
   places,
   selectedPlace,
+  focusedAnimal = null,
   discoveredPlaceIds,
   continentTarget,
   resetSignal,
@@ -74,7 +76,12 @@ export function WorldMap({
     mapRef.current = map;
     layerGroupRef.current = group;
 
+    const resizeTimer = window.setTimeout(() => {
+      map.invalidateSize();
+    }, 60);
+
     return () => {
+      window.clearTimeout(resizeTimer);
       map.remove();
       mapRef.current = null;
       layerGroupRef.current = null;
@@ -90,17 +97,18 @@ export function WorldMap({
 
     places.forEach((place) => {
       const isSelected = selectedPlace?.id === place.id;
+      const isFocusedAnimalPlace = focusedAnimal?.place.id === place.id;
       const isDiscovered = discoveredPlaceIds.has(place.id);
 
       // Soft clickable region highlight circle
       const radiusMeters = (place.radiusKm ?? 250) * 1000;
       const circle = L.circle([place.lat, place.lng], {
-        radius: radiusMeters,
-        color: isSelected ? '#facc15' : place.color,
-        weight: isSelected ? 3.5 : 1.5,
-        opacity: isSelected ? 0.95 : 0.45,
-        fillColor: place.color,
-        fillOpacity: isSelected ? 0.28 : 0.12,
+        radius: isFocusedAnimalPlace ? Math.max(radiusMeters, 320000) : radiusMeters,
+        color: isSelected || isFocusedAnimalPlace ? '#facc15' : place.color,
+        weight: isSelected || isFocusedAnimalPlace ? 4 : 1.5,
+        opacity: isSelected || isFocusedAnimalPlace ? 0.98 : 0.45,
+        fillColor: isFocusedAnimalPlace ? '#facc15' : place.color,
+        fillOpacity: isFocusedAnimalPlace ? 0.32 : isSelected ? 0.28 : 0.12,
         className: 'place-zone-circle',
       });
 
@@ -109,11 +117,19 @@ export function WorldMap({
       });
       circle.addTo(group);
 
-      // Playful custom pin marker
-      const iconHtml = `
+      // Playful custom pin marker (shows special "Found Here!" spotlight in Animal Mode)
+      const iconHtml =
+        isFocusedAnimalPlace && focusedAnimal
+          ? `
+        <div class="map-pin map-pin--selected map-pin--animal-focus" style="--pin-color: ${place.color}">
+          <span class="map-pin__emoji">${focusedAnimal.animal.emoji}</span>
+          <span class="map-pin__label">${focusedAnimal.animal.name} lives here! (${place.name})</span>
+        </div>
+      `
+          : `
         <div class="map-pin ${isSelected ? 'map-pin--selected' : ''} ${
-          isDiscovered ? 'map-pin--discovered' : ''
-        }" style="--pin-color: ${place.color}">
+              isDiscovered ? 'map-pin--discovered' : ''
+            }" style="--pin-color: ${place.color}">
           <span class="map-pin__emoji">${place.emoji}</span>
           <span class="map-pin__label">${place.name}</span>
           <span class="map-pin__count">${place.animals.length}</span>
@@ -130,7 +146,7 @@ export function WorldMap({
 
       const marker = L.marker([place.lat, place.lng], {
         icon,
-        zIndexOffset: isSelected ? 1000 : 100,
+        zIndexOffset: isSelected || isFocusedAnimalPlace ? 1000 : 100,
       });
 
       marker.on('click', () => {
@@ -139,7 +155,7 @@ export function WorldMap({
 
       marker.addTo(group);
     });
-  }, [places, selectedPlace, discoveredPlaceIds]);
+  }, [places, selectedPlace, focusedAnimal, discoveredPlaceIds]);
 
   // Smoothly fly to selected place
   useEffect(() => {
