@@ -1,45 +1,42 @@
 import { useEffect, useState } from 'react';
 
-const photoCache = new Map<string, string | null>();
+const wikiFallbackCache = new Map<string, string | null>();
 
-export function useWikiPhoto(wikiTitle: string) {
-  const [url, setUrl] = useState<string | null>(() =>
-    photoCache.has(wikiTitle) ? photoCache.get(wikiTitle) ?? null : null
-  );
-  const [loading, setLoading] = useState<boolean>(() => !photoCache.has(wikiTitle));
+export function useAnimalPhoto(animalId: string, wikiTitle: string) {
+  const localUrl = `./images/animals/${animalId}.jpg`;
+  const [src, setSrc] = useState<string | null>(localUrl);
+  const [usingFallback, setUsingFallback] = useState<boolean>(false);
 
   useEffect(() => {
-    if (photoCache.has(wikiTitle)) {
-      setUrl(photoCache.get(wikiTitle) ?? null);
-      setLoading(false);
+    setSrc(`./images/animals/${animalId}.jpg`);
+    setUsingFallback(false);
+  }, [animalId]);
+
+  const handleImageError = () => {
+    if (usingFallback) {
+      setSrc(null);
       return;
     }
+    setUsingFallback(true);
 
-    let cancelled = false;
-    setLoading(true);
-    setUrl(null);
+    if (wikiFallbackCache.has(wikiTitle)) {
+      setSrc(wikiFallbackCache.get(wikiTitle) ?? null);
+      return;
+    }
 
     fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${wikiTitle}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (cancelled) return;
         const imgUrl: string | null =
           data?.thumbnail?.source || data?.originalimage?.source || null;
-        photoCache.set(wikiTitle, imgUrl);
-        setUrl(imgUrl);
-        setLoading(false);
+        wikiFallbackCache.set(wikiTitle, imgUrl);
+        setSrc(imgUrl);
       })
       .catch(() => {
-        if (cancelled) return;
-        photoCache.set(wikiTitle, null);
-        setUrl(null);
-        setLoading(false);
+        wikiFallbackCache.set(wikiTitle, null);
+        setSrc(null);
       });
+  };
 
-    return () => {
-      cancelled = true;
-    };
-  }, [wikiTitle]);
-
-  return { url, loading };
+  return { src, handleImageError };
 }

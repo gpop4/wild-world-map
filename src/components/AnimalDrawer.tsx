@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  Maximize2,
   Pause,
   Play,
   Square,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Animal, WorldPlace } from '../types';
 import { SpeedPreset } from '../hooks/useSpeech';
-import { useWikiPhoto } from '../hooks/useWikiPhoto';
+import { useAnimalPhoto } from '../hooks/useWikiPhoto';
 
 interface AnimalDrawerProps {
   place: WorldPlace;
@@ -75,7 +76,8 @@ export function AnimalDrawer({
   onClose,
 }: AnimalDrawerProps) {
   const animal = place.animals[animalIndex] ?? place.animals[0];
-  const { url: photoUrl, loading: photoLoading } = useWikiPhoto(animal.wikiTitle);
+  const { src: photoUrl, handleImageError } = useAnimalPhoto(animal.id, animal.wikiTitle);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const handlePrev = () => {
     const nextIdx = (animalIndex - 1 + place.animals.length) % place.animals.length;
@@ -100,12 +102,16 @@ export function AnimalDrawer({
           (animalIndex - 1 + place.animals.length) % place.animals.length
         );
       } else if (e.key === 'Escape') {
-        onClose();
+        if (lightboxOpen) {
+          setLightboxOpen(false);
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [animalIndex, place.animals.length, onSelectAnimalIndex, onClose]);
+  }, [animalIndex, place.animals.length, onSelectAnimalIndex, onClose, lightboxOpen]);
 
   const handleReadCurrentAnimal = () => {
     speech.playNarration(place, animal, false);
@@ -113,306 +119,440 @@ export function AnimalDrawer({
 
   const isReadingAnimalStory =
     speech.activeSegmentId === 'animal-story' || speech.activeSegmentId === 'animal-header';
+  const isActivelyTalking = speech.isSpeaking && !speech.isPaused;
 
   return (
-    <aside className="animal-drawer" aria-label={`Animals of ${place.name}`}>
-      {/* Place Header */}
-      <div className="drawer-header" style={{ '--place-color': place.color } as React.CSSProperties}>
-        <div className="drawer-header__top">
-          <span className="place-category-pill">{CATEGORY_LABELS[place.category]}</span>
+    <>
+      <aside className="animal-drawer" aria-label={`Animals of ${place.name}`}>
+        {/* Place Header */}
+        <div
+          className="drawer-header"
+          style={{ '--place-color': place.color } as React.CSSProperties}
+        >
+          <div className="drawer-header__top">
+            <span className="place-category-pill">{CATEGORY_LABELS[place.category]}</span>
+            <button
+              type="button"
+              className="icon-circle-btn"
+              onClick={onClose}
+              aria-label="Close animal explorer"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="drawer-header__title-row">
+            <span className="drawer-header__emoji">{place.emoji}</span>
+            <div>
+              <h2 className="drawer-header__title">{place.name}</h2>
+              <p className="drawer-header__subtitle">
+                <MapPin size={14} /> {place.subtitle}
+              </p>
+            </div>
+          </div>
+
           <button
             type="button"
-            className="icon-circle-btn"
-            onClick={onClose}
-            aria-label="Close animal explorer"
+            className={`place-intro-box ${
+              speech.activeSegmentId === 'place-intro' ? 'speaking-highlight' : ''
+            }`}
+            onClick={() => speech.playPlaceIntro(place)}
+            title="Tap to hear about this place"
           >
-            <X size={20} />
+            <p>{place.intro}</p>
+            {speech.supported && (
+              <span className="inline-speak-pill">
+                <Volume2 size={14} /> Hear Place
+              </span>
+            )}
           </button>
         </div>
 
-        <div className="drawer-header__title-row">
-          <span className="drawer-header__emoji">{place.emoji}</span>
-          <div>
-            <h2 className="drawer-header__title">{place.name}</h2>
-            <p className="drawer-header__subtitle">
-              <MapPin size={14} /> {place.subtitle}
-            </p>
-          </div>
+        {/* Visual Animal Photo Gallery Strip */}
+        <div className="animal-strip" role="tablist" aria-label="Animals in this area">
+          {place.animals.map((a, idx) => {
+            const active = idx === animalIndex;
+            const seen = discoveredAnimalIds.has(a.id);
+            return (
+              <button
+                key={a.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`animal-thumb-card ${active ? 'animal-thumb-card--active' : ''}`}
+                onClick={() => onSelectAnimalIndex(idx)}
+              >
+                <div className="animal-thumb-card__img-wrap">
+                  <img
+                    src={`./images/animals/${a.id}.jpg`}
+                    alt={a.name}
+                    className="animal-thumb-card__img"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <span className="animal-thumb-card__fallback-emoji">{a.emoji}</span>
+                  {seen && <span className="animal-thumb-card__star">⭐</span>}
+                </div>
+                <span className="animal-thumb-card__name">{a.name}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <button
-          type="button"
-          className={`place-intro-box ${
-            speech.activeSegmentId === 'place-intro' ? 'speaking-highlight' : ''
-          }`}
-          onClick={() => speech.playPlaceIntro(place)}
-          title="Tap to hear about this place"
-        >
-          <p>{place.intro}</p>
-          {speech.supported && (
-            <span className="inline-speak-pill">
-              <Volume2 size={14} /> Hear Place
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Animal Selector Strip */}
-      <div className="animal-strip" role="tablist" aria-label="Animals in this area">
-        {place.animals.map((a, idx) => {
-          const active = idx === animalIndex;
-          const seen = discoveredAnimalIds.has(a.id);
-          return (
-            <button
-              key={a.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className={`animal-tab ${active ? 'animal-tab--active' : ''}`}
-              onClick={() => onSelectAnimalIndex(idx)}
-            >
-              <span className="animal-tab__emoji">{a.emoji}</span>
-              <span className="animal-tab__name">{a.name}</span>
-              {seen && <span className="animal-tab__star">⭐</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Scrollable Animal Content */}
-      <div className="drawer-body">
-        {/* Read Aloud Control Bar */}
-        {speech.supported && (
-          <div className="speech-bar">
-            <div className="speech-bar__buttons">
-              {!speech.isSpeaking ? (
-                <button
-                  type="button"
-                  className="btn-read-aloud"
-                  onClick={handleReadCurrentAnimal}
-                >
-                  <Volume2 size={18} /> Read Aloud
-                </button>
-              ) : speech.isPaused ? (
-                <button
-                  type="button"
-                  className="btn-read-aloud btn-read-aloud--active"
-                  onClick={speech.resume}
-                >
-                  <Play size={18} /> Resume
-                </button>
+        {/* Scrollable Animal Content */}
+        <div className="drawer-body">
+          {/* Animal Hero Photo Card (front & center!) */}
+          <div
+            className={`animal-hero ${isReadingAnimalStory ? 'speaking-highlight' : ''}`}
+            style={{ '--animal-accent': animal.accentColor } as React.CSSProperties}
+          >
+            <div className="animal-hero__media">
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt={animal.name}
+                  className="animal-hero__img"
+                  loading="eager"
+                  onError={handleImageError}
+                  onClick={() => setLightboxOpen(true)}
+                />
               ) : (
+                <div className="animal-hero__fallback">
+                  <span className="animal-hero__big-emoji">{animal.emoji}</span>
+                </div>
+              )}
+
+              {photoUrl && (
                 <button
                   type="button"
-                  className="btn-read-aloud btn-read-aloud--active"
-                  onClick={speech.pause}
+                  className="hero-zoom-btn"
+                  onClick={() => setLightboxOpen(true)}
+                  title="See big picture"
+                  aria-label="Open large picture"
                 >
-                  <Pause size={18} /> Pause
+                  <Maximize2 size={16} /> Big Photo
                 </button>
               )}
 
-              {speech.isSpeaking && (
-                <button
-                  type="button"
-                  className="btn-stop-speech"
-                  onClick={speech.stop}
-                  aria-label="Stop reading"
-                >
-                  <Square size={15} /> Stop
-                </button>
+              <span className="animal-hero__counter">
+                {animalIndex + 1} / {place.animals.length}
+              </span>
+
+              {isActivelyTalking && (
+                <div className="talking-banner" aria-live="polite">
+                  <span className="talking-bars" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <span>
+                    {speech.activeSegmentId === 'place-intro'
+                      ? `Exploring ${place.name}...`
+                      : `Talking about the ${animal.name}...`}
+                  </span>
+                </div>
               )}
-            </div>
 
-            <div className="speech-bar__options">
-              {speech.hasAnimalStudioVoice(animal.id) && (
-                <span className="studio-voice-tag" title="Pre-recorded Gemini Studio Narration">
-                  ✨ AI Voice
-                </span>
-              )}
-              <button
-                type="button"
-                className={`speed-pill ${
-                  speech.speedPreset === 'slow' ? 'speed-pill--active' : ''
-                }`}
-                onClick={() => speech.setSpeedPreset('slow')}
-                title="Extra slow story pace"
-              >
-                🐢
-              </button>
-              <button
-                type="button"
-                className={`speed-pill ${
-                  speech.speedPreset === 'normal' ? 'speed-pill--active' : ''
-                }`}
-                onClick={() => speech.setSpeedPreset('normal')}
-                title="Gentle kid-friendly speed"
-              >
-                🦊
-              </button>
-              <button
-                type="button"
-                className={`speed-pill ${
-                  speech.speedPreset === 'fast' ? 'speed-pill--active' : ''
-                }`}
-                onClick={() => speech.setSpeedPreset('fast')}
-                title="Faster speed"
-              >
-                🐆
-              </button>
-
-              <button
-                type="button"
-                className={`auto-read-mini ${autoRead ? 'auto-read-mini--on' : ''}`}
-                onClick={onToggleAutoRead}
-                title="Automatically read when clicking animals"
-              >
-                {autoRead ? 'Auto: ON' : 'Auto: OFF'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Animal Hero Card with Prev/Next */}
-        <div
-          className={`animal-hero ${isReadingAnimalStory ? 'speaking-highlight' : ''}`}
-          style={{ '--animal-accent': animal.accentColor } as React.CSSProperties}
-        >
-          <div className="animal-hero__media">
-            {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt={animal.name}
-                className="animal-hero__img"
-                loading="eager"
-              />
-            ) : (
-              <div className="animal-hero__fallback">
-                <span className="animal-hero__big-emoji">{animal.emoji}</span>
-                {photoLoading && <span className="photo-loading-tag">Loading photo...</span>}
-              </div>
-            )}
-
-            <span className="animal-hero__counter">
-              {animalIndex + 1} / {place.animals.length}
-            </span>
-
-            {place.animals.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  className="hero-nav-btn hero-nav-btn--prev"
-                  onClick={handlePrev}
-                  aria-label="Previous animal"
-                >
-                  <ChevronLeft size={26} />
-                </button>
-                <button
-                  type="button"
-                  className="hero-nav-btn hero-nav-btn--next"
-                  onClick={handleNext}
-                  aria-label="Next animal"
-                >
-                  <ChevronRight size={26} />
-                </button>
-              </>
-            )}
-          </div>
-
-          <div className="animal-hero__info">
-            <div className="animal-hero__name-row">
-              <h3>
-                <span className="animal-hero__emoji-inline">{animal.emoji}</span> {animal.name}
-              </h3>
-              <span className={`status-badge ${STATUS_CLASS[animal.status]}`}>
-                {animal.status}
-              </span>
-            </div>
-
-            <div className="quick-badges">
-              <span className="quick-badge">
-                <Sparkles size={13} /> {animal.group}
-              </span>
-              <span className="quick-badge">
-                <Utensils size={13} /> {DIET_EMOJI[animal.diet]}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Sound Callout */}
-        <button
-          type="button"
-          className={`sound-card ${
-            speech.activeSegmentId === 'animal-sound' ? 'speaking-highlight' : ''
-          }`}
-          onClick={() => speech.speakText(animal.soundText, 'animal-sound')}
-        >
-          <span className="sound-card__icon">🎵</span>
-          <div className="sound-card__text">
-            <strong>Animal Sound</strong>
-            <span>{animal.soundText}</span>
-          </div>
-          {speech.supported && <Volume2 size={18} className="sound-card__speaker" />}
-        </button>
-
-        {/* Habitat & Size Cards */}
-        <div className="detail-grid">
-          <div className="detail-card">
-            <div className="detail-card__label">
-              <Trees size={15} /> Where It Lives
-            </div>
-            <p>{animal.habitat}</p>
-          </div>
-          <div className="detail-card">
-            <div className="detail-card__label">
-              <Ruler size={15} /> How Big Is It?
-            </div>
-            <p>{animal.sizeComparison}</p>
-          </div>
-        </div>
-
-        {/* Fun Facts List */}
-        <div className="facts-section">
-          <h4 className="facts-section__title">✨ Fun Facts! (Tap any fact to hear it)</h4>
-          <ul className="facts-list">
-            {animal.facts.map((fact, idx) => {
-              const segId = `fact-${idx}`;
-              const isReadingThis = speech.activeSegmentId === segId;
-              return (
-                <li key={idx}>
+              {place.animals.length > 1 && (
+                <>
                   <button
                     type="button"
-                    className={`fact-card ${isReadingThis ? 'speaking-highlight' : ''}`}
-                    onClick={() => speech.speakText(fact, segId)}
+                    className="hero-nav-btn hero-nav-btn--prev"
+                    onClick={handlePrev}
+                    aria-label="Previous animal"
                   >
-                    <span className="fact-card__num">{idx + 1}</span>
-                    <span className="fact-card__text">{fact}</span>
-                    {speech.supported && (
-                      <Volume2 size={16} className="fact-card__speaker" />
-                    )}
+                    <ChevronLeft size={26} />
                   </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+                  <button
+                    type="button"
+                    className="hero-nav-btn hero-nav-btn--next"
+                    onClick={handleNext}
+                    aria-label="Next animal"
+                  >
+                    <ChevronRight size={26} />
+                  </button>
+                </>
+              )}
+            </div>
 
-        {/* Big Bottom Navigation for Little Fingers */}
-        {place.animals.length > 1 && (
-          <div className="drawer-footer-nav">
-            <button type="button" className="big-nav-btn" onClick={handlePrev}>
-              <ChevronLeft size={20} /> Previous Animal
-            </button>
-            <button
-              type="button"
-              className="big-nav-btn big-nav-btn--primary"
-              onClick={handleNext}
-            >
-              Next Animal <ChevronRight size={20} />
-            </button>
+            <div className="animal-hero__info">
+              <div className="animal-hero__name-row">
+                <h3>
+                  <span className="animal-hero__emoji-inline">{animal.emoji}</span> {animal.name}
+                </h3>
+                <span className={`status-badge ${STATUS_CLASS[animal.status]}`}>
+                  {animal.status}
+                </span>
+              </div>
+
+              <div className="quick-badges">
+                <span className="quick-badge">
+                  <Sparkles size={13} /> {animal.group}
+                </span>
+                <span className="quick-badge">
+                  <Utensils size={13} /> {DIET_EMOJI[animal.diet]}
+                </span>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
-    </aside>
+
+          {/* Read Aloud Control Bar */}
+          {speech.supported && (
+            <div className="speech-bar">
+              <div className="speech-bar__buttons">
+                {!speech.isSpeaking ? (
+                  <button
+                    type="button"
+                    className="btn-read-aloud"
+                    onClick={handleReadCurrentAnimal}
+                  >
+                    <Volume2 size={18} /> Read Aloud
+                  </button>
+                ) : speech.isPaused ? (
+                  <button
+                    type="button"
+                    className="btn-read-aloud btn-read-aloud--active"
+                    onClick={speech.resume}
+                  >
+                    <Play size={18} /> Resume
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-read-aloud btn-read-aloud--active"
+                    onClick={speech.pause}
+                  >
+                    <Pause size={18} /> Pause
+                  </button>
+                )}
+
+                {speech.isSpeaking && (
+                  <button
+                    type="button"
+                    className="btn-stop-speech"
+                    onClick={speech.stop}
+                    aria-label="Stop reading"
+                  >
+                    <Square size={15} /> Stop
+                  </button>
+                )}
+              </div>
+
+              <div className="speech-bar__options">
+                {speech.hasAnimalStudioVoice(animal.id) && (
+                  <span className="studio-voice-tag" title="Pre-recorded Gemini Studio Narration">
+                    ✨ AI Voice
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className={`speed-pill ${
+                    speech.speedPreset === 'slow' ? 'speed-pill--active' : ''
+                  }`}
+                  onClick={() => speech.setSpeedPreset('slow')}
+                  title="Extra slow story pace"
+                >
+                  🐢
+                </button>
+                <button
+                  type="button"
+                  className={`speed-pill ${
+                    speech.speedPreset === 'normal' ? 'speed-pill--active' : ''
+                  }`}
+                  onClick={() => speech.setSpeedPreset('normal')}
+                  title="Gentle kid-friendly speed"
+                >
+                  🦊
+                </button>
+                <button
+                  type="button"
+                  className={`speed-pill ${
+                    speech.speedPreset === 'fast' ? 'speed-pill--active' : ''
+                  }`}
+                  onClick={() => speech.setSpeedPreset('fast')}
+                  title="Faster speed"
+                >
+                  🐆
+                </button>
+
+                <button
+                  type="button"
+                  className={`auto-read-mini ${autoRead ? 'auto-read-mini--on' : ''}`}
+                  onClick={onToggleAutoRead}
+                  title="Automatically read when clicking animals"
+                >
+                  {autoRead ? 'Auto: ON' : 'Auto: OFF'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Sound Callout */}
+          <button
+            type="button"
+            className={`sound-card ${
+              speech.activeSegmentId === 'animal-sound' ? 'speaking-highlight' : ''
+            }`}
+            onClick={() => speech.speakText(animal.soundText, 'animal-sound')}
+          >
+            <span className="sound-card__icon">🎵</span>
+            <div className="sound-card__text">
+              <strong>Animal Sound</strong>
+              <span>{animal.soundText}</span>
+            </div>
+            {speech.supported && <Volume2 size={18} className="sound-card__speaker" />}
+          </button>
+
+          {/* Habitat & Size Cards */}
+          <div className="detail-grid">
+            <div className="detail-card">
+              <div className="detail-card__label">
+                <Trees size={15} /> Where It Lives
+              </div>
+              <p>{animal.habitat}</p>
+            </div>
+            <div className="detail-card">
+              <div className="detail-card__label">
+                <Ruler size={15} /> How Big Is It?
+              </div>
+              <p>{animal.sizeComparison}</p>
+            </div>
+          </div>
+
+          {/* Fun Facts List */}
+          <div className="facts-section">
+            <h4 className="facts-section__title">✨ Fun Facts! (Tap any fact to hear it)</h4>
+            <ul className="facts-list">
+              {animal.facts.map((fact, idx) => {
+                const segId = `fact-${idx}`;
+                const isReadingThis = speech.activeSegmentId === segId;
+                return (
+                  <li key={idx}>
+                    <button
+                      type="button"
+                      className={`fact-card ${isReadingThis ? 'speaking-highlight' : ''}`}
+                      onClick={() => speech.speakText(fact, segId)}
+                    >
+                      <span className="fact-card__num">{idx + 1}</span>
+                      <span className="fact-card__text">{fact}</span>
+                      {speech.supported && (
+                        <Volume2 size={16} className="fact-card__speaker" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* Big Bottom Navigation for Little Fingers */}
+          {place.animals.length > 1 && (
+            <div className="drawer-footer-nav">
+              <button type="button" className="big-nav-btn" onClick={handlePrev}>
+                <ChevronLeft size={20} /> Previous Animal
+              </button>
+              <button
+                type="button"
+                className="big-nav-btn big-nav-btn--primary"
+                onClick={handleNext}
+              >
+                Next Animal <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Big Picture Storybook Lightbox */}
+      {lightboxOpen && photoUrl && (
+        <div
+          className="photo-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Large picture of ${animal.name}`}
+          onClick={() => setLightboxOpen(false)}
+        >
+          <div className="photo-lightbox__card" onClick={(e) => e.stopPropagation()}>
+            <div className="photo-lightbox__top">
+              <div className="photo-lightbox__title">
+                <span>{animal.emoji}</span>
+                <h3>{animal.name}</h3>
+                <span className="photo-lightbox__place">• {place.name}</span>
+              </div>
+              <button
+                type="button"
+                className="icon-circle-btn"
+                onClick={() => setLightboxOpen(false)}
+                aria-label="Close big photo"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="photo-lightbox__stage">
+              <img src={photoUrl} alt={animal.name} className="photo-lightbox__img" />
+
+              {place.animals.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="hero-nav-btn hero-nav-btn--prev"
+                    onClick={handlePrev}
+                    aria-label="Previous animal"
+                  >
+                    <ChevronLeft size={28} />
+                  </button>
+                  <button
+                    type="button"
+                    className="hero-nav-btn hero-nav-btn--next"
+                    onClick={handleNext}
+                    aria-label="Next animal"
+                  >
+                    <ChevronRight size={28} />
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="photo-lightbox__footer">
+              <p className="photo-lightbox__caption">
+                🎵 <strong>{animal.soundText}</strong> — {animal.sizeComparison}
+              </p>
+              {speech.supported && (
+                <div className="photo-lightbox__controls">
+                  {!speech.isSpeaking ? (
+                    <button
+                      type="button"
+                      className="btn-read-aloud"
+                      onClick={handleReadCurrentAnimal}
+                    >
+                      <Volume2 size={18} /> Read Aloud
+                    </button>
+                  ) : speech.isPaused ? (
+                    <button
+                      type="button"
+                      className="btn-read-aloud btn-read-aloud--active"
+                      onClick={speech.resume}
+                    >
+                      <Play size={18} /> Resume
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-read-aloud btn-read-aloud--active"
+                      onClick={speech.pause}
+                    >
+                      <Pause size={18} /> Pause
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
