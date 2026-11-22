@@ -48,12 +48,27 @@ export function WorldMap({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Colorful, kid-friendly Carto Voyager basemap
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19,
-    }).addTo(map);
+    // National Geographic World Map basemap (no API key required, rich geography & colors)
+    const natGeoLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: 'Tiles &copy; Esri &mdash; National Geographic',
+        maxZoom: 10,
+        maxNativeZoom: 10,
+      }
+    );
+
+    let switchedToFallback = false;
+    natGeoLayer.on('tileerror', () => {
+      if (switchedToFallback) return;
+      switchedToFallback = true;
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 10,
+      }).addTo(map);
+    });
+
+    natGeoLayer.addTo(map);
 
     const group = L.layerGroup().addTo(map);
     mapRef.current = map;

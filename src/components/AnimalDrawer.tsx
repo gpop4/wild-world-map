@@ -254,27 +254,27 @@ export function AnimalDrawer({
             <div className="speech-bar__options">
               <button
                 type="button"
-                className={`speed-pill ${speech.rate <= 0.85 ? 'speed-pill--active' : ''}`}
-                onClick={() => speech.setRate(0.8)}
-                title="Slow speed"
+                className={`speed-pill ${speech.rate <= 0.7 ? 'speed-pill--active' : ''}`}
+                onClick={() => speech.setRate(0.65)}
+                title="Extra slow story pace"
               >
                 🐢
               </button>
               <button
                 type="button"
                 className={`speed-pill ${
-                  speech.rate > 0.85 && speech.rate < 1.05 ? 'speed-pill--active' : ''
+                  speech.rate > 0.7 && speech.rate < 0.88 ? 'speed-pill--active' : ''
                 }`}
-                onClick={() => speech.setRate(0.92)}
-                title="Normal kid-friendly speed"
+                onClick={() => speech.setRate(0.78)}
+                title="Gentle kid-friendly speed"
               >
                 🦊
               </button>
               <button
                 type="button"
-                className={`speed-pill ${speech.rate >= 1.05 ? 'speed-pill--active' : ''}`}
-                onClick={() => speech.setRate(1.1)}
-                title="Fast speed"
+                className={`speed-pill ${speech.rate >= 0.88 ? 'speed-pill--active' : ''}`}
+                onClick={() => speech.setRate(0.92)}
+                title="Regular speed"
               >
                 🐆
               </button>

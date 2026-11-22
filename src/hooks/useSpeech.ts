@@ -11,12 +11,18 @@ export function useSpeech() {
   );
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
-  const [rate, setRate] = useState<number>(0.92);
+  const [rate, setRate] = useState<number>(0.78);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
 
   const runIdRef = useRef<number>(0);
+  const rateRef = useRef<number>(rate);
+  const pauseTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    rateRef.current = rate;
+  }, [rate]);
 
   useEffect(() => {
     if (!supported) return;
@@ -56,15 +62,23 @@ export function useSpeech() {
     };
   }, [supported, selectedVoiceURI]);
 
+  const clearPauseTimer = useCallback(() => {
+    if (pauseTimerRef.current !== null) {
+      window.clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = null;
+    }
+  }, []);
+
   const stop = useCallback(() => {
     runIdRef.current += 1;
+    clearPauseTimer();
     if (supported) {
       window.speechSynthesis.cancel();
     }
     setIsSpeaking(false);
     setIsPaused(false);
     setActiveSegmentId(null);
-  }, [supported]);
+  }, [supported, clearPauseTimer]);
 
   const pause = useCallback(() => {
     if (!supported || !isSpeaking) return;
@@ -85,6 +99,7 @@ export function useSpeech() {
       runIdRef.current += 1;
       const currentRunId = runIdRef.current;
 
+      clearPauseTimer();
       window.speechSynthesis.cancel();
       setIsSpeaking(true);
       setIsPaused(false);
@@ -105,8 +120,8 @@ export function useSpeech() {
         if (chosenVoice) {
           utterance.voice = chosenVoice;
         }
-        utterance.rate = rate;
-        utterance.pitch = 1.05;
+        utterance.rate = rateRef.current;
+        utterance.pitch = 1.0;
 
         utterance.onstart = () => {
           if (runIdRef.current === currentRunId) {
@@ -116,12 +131,16 @@ export function useSpeech() {
 
         utterance.onend = () => {
           if (runIdRef.current === currentRunId) {
-            speakIndex(idx + 1);
+            pauseTimerRef.current = window.setTimeout(() => {
+              pauseTimerRef.current = null;
+              speakIndex(idx + 1);
+            }, 450);
           }
         };
 
         utterance.onerror = () => {
           if (runIdRef.current === currentRunId) {
+            clearPauseTimer();
             setIsSpeaking(false);
             setIsPaused(false);
             setActiveSegmentId(null);
@@ -133,7 +152,7 @@ export function useSpeech() {
 
       speakIndex(0);
     },
-    [supported, voices, selectedVoiceURI, rate]
+    [supported, voices, selectedVoiceURI, clearPauseTimer]
   );
 
   const speakText = useCallback(
@@ -145,11 +164,12 @@ export function useSpeech() {
 
   useEffect(() => {
     return () => {
+      clearPauseTimer();
       if (supported) {
         window.speechSynthesis.cancel();
       }
     };
-  }, [supported]);
+  }, [supported, clearPauseTimer]);
 
   return {
     supported,
