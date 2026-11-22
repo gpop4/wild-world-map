@@ -243,11 +243,12 @@ def generate_one(
             return kind, item_id, out_path.stat().st_size
         except Exception as exc:
             msg = str(exc)
-            if "exceeded your current quota" in msg.lower() or "perday" in msg.lower():
-                raise RuntimeError(f"Daily quota reached on {kind}/{item_id}: {msg[:140]}") from exc
+            lower = msg.lower()
+            if "perday" in lower or "per_day" in lower or "requestsperday" in lower:
+                raise RuntimeError(f"Daily quota reached on {kind}/{item_id}: {msg[:180]}") from exc
             if attempt == max_retries:
                 raise RuntimeError(f"Failed {kind}/{item_id} after {max_retries} attempts: {msg}") from exc
-            sleep_sec = min(4 * (2 ** (attempt - 1)), 45)
+            sleep_sec = 25 if "429" in msg or "resource_exhausted" in lower else min(4 * (2 ** (attempt - 1)), 45)
             print(f"  [retry {attempt}/{max_retries}] {kind}/{item_id}: {msg[:100]} -> waiting {sleep_sec}s", flush=True)
             time.sleep(sleep_sec)
 

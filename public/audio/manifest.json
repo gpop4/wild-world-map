@@ -5,7 +5,10 @@
     "yellowstone": "audio/places/yellowstone.m4a",
     "alaska": "audio/places/alaska.m4a",
     "everglades": "audio/places/everglades.m4a",
-    "banff-canada": "audio/places/banff-canada.m4a"
+    "sonoran-desert": "audio/places/sonoran-desert.m4a",
+    "banff-canada": "audio/places/banff-canada.m4a",
+    "mexico": "audio/places/mexico.m4a",
+    "amazon": "audio/places/amazon.m4a"
   },
   "animals": {
     "grizzly-bear": "audio/animals/grizzly-bear.m4a",
@@ -14,9 +17,20 @@
     "bald-eagle": "audio/animals/bald-eagle.m4a",
     "moose": "audio/animals/moose.m4a",
     "polar-bear": "audio/animals/polar-bear.m4a",
+    "beluga-whale": "audio/animals/beluga-whale.m4a",
     "american-alligator": "audio/animals/american-alligator.m4a",
     "manatee": "audio/animals/manatee.m4a",
+    "roseate-spoonbill": "audio/animals/roseate-spoonbill.m4a",
     "roadrunner": "audio/animals/roadrunner.m4a",
-    "gila-monster": "audio/animals/gila-monster.m4a"
+    "gila-monster": "audio/animals/gila-monster.m4a",
+    "elf-owl": "audio/animals/elf-owl.m4a",
+    "beaver": "audio/animals/beaver.m4a",
+    "bighorn-sheep": "audio/animals/bighorn-sheep.m4a",
+    "canada-lynx": "audio/animals/canada-lynx.m4a",
+    "axolotl": "audio/animals/axolotl.m4a",
+    "monarch-butterfly": "audio/animals/monarch-butterfly.m4a",
+    "jaguar": "audio/animals/jaguar.m4a",
+    "toco-toucan": "audio/animals/toco-toucan.m4a",
+    "pink-river-dolphin": "audio/animals/pink-river-dolphin.m4a"
   }
 }
