@@ -124,13 +124,21 @@ export function AnimalDrawer({
   return (
     <>
       <aside className="animal-drawer" aria-label={`Animals of ${place.name}`}>
-        {/* Place Header */}
+        {/* Compact Place Header so the big animal photo is immediately visible */}
         <div
           className="drawer-header"
           style={{ '--place-color': place.color } as React.CSSProperties}
         >
-          <div className="drawer-header__top">
-            <span className="place-category-pill">{CATEGORY_LABELS[place.category]}</span>
+          <div className="drawer-header__compact-row">
+            <span className="drawer-header__emoji">{place.emoji}</span>
+            <div className="drawer-header__title-wrap">
+              <div className="drawer-header__title-line">
+                <h2 className="drawer-header__title">{place.name}</h2>
+              </div>
+              <p className="drawer-header__subtitle">
+                <MapPin size={13} /> {place.subtitle} • {CATEGORY_LABELS[place.category]}
+              </p>
+            </div>
             <button
               type="button"
               className="icon-circle-btn"
@@ -140,32 +148,6 @@ export function AnimalDrawer({
               <X size={20} />
             </button>
           </div>
-
-          <div className="drawer-header__title-row">
-            <span className="drawer-header__emoji">{place.emoji}</span>
-            <div>
-              <h2 className="drawer-header__title">{place.name}</h2>
-              <p className="drawer-header__subtitle">
-                <MapPin size={14} /> {place.subtitle}
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className={`place-intro-box ${
-              speech.activeSegmentId === 'place-intro' ? 'speaking-highlight' : ''
-            }`}
-            onClick={() => speech.playPlaceIntro(place)}
-            title="Tap to hear about this place"
-          >
-            <p>{place.intro}</p>
-            {speech.supported && (
-              <span className="inline-speak-pill">
-                <Volume2 size={14} /> Hear Place
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Visual Animal Photo Gallery Strip */}
@@ -403,6 +385,26 @@ export function AnimalDrawer({
               <span>{animal.soundText}</span>
             </div>
             {speech.supported && <Volume2 size={18} className="sound-card__speaker" />}
+          </button>
+
+          {/* Place Intro Card */}
+          <button
+            type="button"
+            className={`place-intro-box ${
+              speech.activeSegmentId === 'place-intro' ? 'speaking-highlight' : ''
+            }`}
+            onClick={() => speech.playPlaceIntro(place)}
+            title="Tap to hear about this place"
+          >
+            <div className="place-intro-box__header">
+              <span>{place.emoji} About {place.name}</span>
+              {speech.supported && (
+                <span className="inline-speak-pill">
+                  <Volume2 size={13} /> Hear Place
+                </span>
+              )}
+            </div>
+            <p>{place.intro}</p>
           </button>
 
           {/* Habitat & Size Cards */}
